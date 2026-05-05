@@ -1,65 +1,75 @@
 #!/usr/bin/env node
+/**
+ * cli.js — Command-line interface for envdiff
+ */
 
-'use strict';
-
-const { program } = require('commander');
+const path = require('path');
+const fs = require('fs');
 const { diffFiles } = require('./index');
 const { formatReport } = require('./reporter');
-const { version } = require('../package.json');
+const { exportReport } = require('./exporter');
+const { loadConfig } = require('./config');
 
-program
-  .name('envdiff')
-  .description('Compare .env files across environments and flag missing or mismatched keys')
-  .version(version);
+const args = process.argv.slice(2);
 
-program
-  .command('diff <base> <compare>')
-  .description('Diff two .env files')
-  .option('-q, --quiet', 'suppress output, exit code only')
-  .option('--no-color', 'disable colored output')
-  .option('-f, --format <type>', 'output format: text or json', 'text')
-  .action((base, compare, options) => {
-    try {
-      const result = diffFiles(base, compare);
-      if (!options.quiet) {
-        if (options.format === 'json') {
-          console.log(JSON.stringify(result, null, 2));
-        } else {
-          const report = formatReport(result, { color: options.color });
-          console.log(report);
-        }
-      }
-      const hasIssues = result.missing.length > 0 || result.mismatched.length > 0;
-      process.exit(hasIssues ? 1 : 0);
-    } catch (err) {
-      console.error(`Error: ${err.message}`);
-      process.exit(2);
-    }
-  });
+function printUsage() {
+  console.log(`
+Usage: envdiff <file1> <file2> [options]
 
-program
-  .command('check <base> [others...]')
-  .description('Check one or more .env files against a base')
-  .option('--no-color', 'disable colored output')
-  .option('-f, --format <type>', 'output format: text or json', 'text')
-  .action((base, others, options) => {
-    let hasIssues = false;
-    for (const other of others) {
-      try {
-        const result = diffFiles(base, other);
-        if (options.format === 'json') {
-          console.log(JSON.stringify({ file: other, ...result }, null, 2));
-        } else {
-          const report = formatReport(result, { color: options.color, label: other });
-          console.log(report);
-        }
-        if (result.missing.length > 0 || result.mismatched.length > 0) hasIssues = true;
-      } catch (err) {
-        console.error(`Error processing ${other}: ${err.message}`);
-        hasIssues = true;
-      }
-    }
-    process.exit(hasIssues ? 1 : 0);
-  });
+Options:
+  --format <json|csv|markdown>   Export format (default: terminal)
+  --output <file>                Write output to file instead of stdout
+  --config <file>                Path to envdiff config file
+  --help                         Show this help message
+`);
+}
 
-program.parse(process.argv);
+function parseArgs(argv) {
+  const opts = { files: [], format: null, output: null, config: null };
+  let i = 0;
+  while (i < argv.length) {
+    const arg = argv[i];
+    if (arg === '--help') { printUsage(); process.exit(0); }
+    else if (arg === '--format') { opts.format = argv[++i]; }
+    else if (arg === '--output') { opts.output = argv[++i]; }
+    else if (arg === '--config') { opts.config = argv[++i]; }
+    else if (!arg.startsWith('--')) { opts.files.push(arg); }
+    i++;
+  }
+  return opts;
+}
+
+async function main() {
+  const opts = parseArgs(args);
+
+  if (opts.files.length < 2) {
+    console.error('Error: at least two .env files are required.');
+    printUsage();
+    process.exit(1);
+  }
+
+  const config = opts.config ? loadConfig(opts.config) : {};
+  const report = await diffFiles(opts.files, config);
+
+  let output;
+  if (opts.format) {
+    output = exportReport(report, opts.format);
+  } else {
+    output = formatReport(report);
+  }
+
+  if (opts.output) {
+    fs.writeFileSync(path.resolve(opts.output), output + '\n', 'utf8');
+    console.log(`Output written to ${opts.output}`);
+  } else {
+    console.log(output);
+  }
+
+  const hasMissing = Object.values(report).some(v => v.status === 'missing');
+  process.exit(hasMissing ? 1 : 0);
+}
+
+main().catch(err => {
+  console.error('envdiff error:', err.message);
+  process.exit(2);
+});
