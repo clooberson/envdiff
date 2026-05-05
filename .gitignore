@@ -1,0 +1,14 @@
+node_modules/
+build/
+yarn-debug.log*
+*.log
+yarn-error.log*
+.cache/
+.vscode/
+.parcel-cache/
+npm-debug.log*
+.next/
+.env.local
+dist/
+.env
+.idea/
