@@ -1,17 +1,14 @@
-/**
- * envdiff public API — ties together parsing, comparing, and reporting.
- */
-
 const fs = require('fs');
 const path = require('path');
 const { parseEnv } = require('./parser');
-const { compareEnvs, isClean } = require('./comparator');
+const { compareEnvs } = require('./comparator');
 const { formatReport } = require('./reporter');
+const { sortGrouped } = require('./sorter');
 
 /**
- * Load and parse an env file from disk.
+ * Load and parse a .env file from disk.
  * @param {string} filePath
- * @returns {Record<string, string>}
+ * @returns {Object} parsed key-value map
  */
 function loadEnvFile(filePath) {
   const resolved = path.resolve(filePath);
@@ -23,28 +20,27 @@ function loadEnvFile(filePath) {
 }
 
 /**
- * Compare two env files and return a formatted report string.
- * @param {string} fileA - Path to the first .env file
- * @param {string} fileB - Path to the second .env file
+ * Diff two .env files and return a formatted report string.
+ * @param {string} baseFile - path to the base .env file
+ * @param {string} compareFile - path to the file to compare against
  * @param {Object} [options]
- * @param {boolean} [options.ignoreValues=false]
- * @param {boolean} [options.color=true]
- * @returns {{ report: string, clean: boolean }}
+ * @param {boolean} [options.sort=false] - sort and group results by status
+ * @param {boolean} [options.color=true] - colorize output
+ * @returns {string} formatted report
  */
-function diffFiles(fileA, fileB, options = {}) {
-  const { ignoreValues = false, color = true } = options;
+function diffFiles(baseFile, compareFile, options = {}) {
+  const { sort = false, color = true } = options;
 
-  const envA = loadEnvFile(fileA);
-  const envB = loadEnvFile(fileB);
+  const base = loadEnvFile(baseFile);
+  const compare = loadEnvFile(compareFile);
 
-  const labelA = path.basename(fileA);
-  const labelB = path.basename(fileB);
+  let result = compareEnvs(base, compare);
 
-  const diff = compareEnvs(envA, envB, { ignoreValues });
-  const report = formatReport(diff, { labelA, labelB, color });
-  const clean = isClean(diff);
+  if (sort) {
+    result = { ...result, entries: sortGrouped(result.entries) };
+  }
 
-  return { report, clean, diff };
+  return formatReport(result, { color });
 }
 
-module.exports = { diffFiles, loadEnvFile, compareEnvs, isClean, formatReport };
+module.exports = { loadEnvFile, diffFiles };
