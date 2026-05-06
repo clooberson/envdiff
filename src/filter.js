@@ -43,6 +43,23 @@ function filterExcludeKeys(diffResult, exclude) {
 }
 
 /**
+ * Filter diff results to only include keys matching a glob-style wildcard string.
+ * Supports '*' as a wildcard for any sequence of characters.
+ * @param {object} diffResult - output from compareEnvs
+ * @param {string} pattern - glob pattern, e.g. 'DB_*' or '*_SECRET'
+ * @returns {object}
+ */
+function filterByGlob(diffResult, pattern) {
+  if (!pattern || typeof pattern !== 'string') {
+    return diffResult;
+  }
+
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp('^' + escaped.replace(/\*/g, '.*') + '$');
+  return filterByKeys(diffResult, regex);
+}
+
+/**
  * Build a matcher function from a string array or RegExp.
  * @param {string[]|RegExp} pattern
  * @returns {function(string): boolean}
@@ -58,4 +75,4 @@ function buildMatcher(pattern) {
   throw new TypeError('include/exclude must be a string array or RegExp');
 }
 
-module.exports = { filterByKeys, filterExcludeKeys, buildMatcher };
+module.exports = { filterByKeys, filterExcludeKeys, filterByGlob, buildMatcher };
