@@ -43,6 +43,16 @@ describe('compareEnvs', () => {
     expect(isClean(result)).toBe(false);
   });
 
+  test('isClean returns false when only missingInA has entries', () => {
+    const r = compareEnvs({}, { ONLY_B: '1' });
+    expect(isClean(r)).toBe(false);
+  });
+
+  test('isClean returns false when only mismatched has entries', () => {
+    const r = compareEnvs({ KEY: 'a' }, { KEY: 'b' });
+    expect(isClean(r)).toBe(false);
+  });
+
   test('empty envs produce clean diff', () => {
     const r = compareEnvs({}, {});
     expect(isClean(r)).toBe(true);
