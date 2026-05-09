@@ -24,6 +24,18 @@ describe('saveSnapshot / loadSnapshot', () => {
   test('loadSnapshot throws if file missing', () => {
     expect(() => loadSnapshot('/nonexistent/path.json')).toThrow('Snapshot not found');
   });
+
+  test('saveSnapshot persists valid JSON to disk', () => {
+    const env = { KEY: 'value' };
+    const p = tmpFile('json-check');
+    saveSnapshot(env, p);
+    const raw = fs.readFileSync(p, 'utf8');
+    expect(() => JSON.parse(raw)).not.toThrow();
+    const parsed = JSON.parse(raw);
+    expect(parsed).toHaveProperty('env');
+    expect(parsed).toHaveProperty('timestamp');
+    fs.unlinkSync(p);
+  });
 });
 
 describe('diffSnapshot', () => {
